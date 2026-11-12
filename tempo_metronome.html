@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tempo — Metronome</title>
+<style>
+:root{color-scheme:dark;--bg:#10131c;--panel:#1b2030;--border:#343b50;--text:#f4f5fa;--muted:#aab1c4;--accent:#8b7cff}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 16px;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text)}
+main{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:26px;margin:2px 0}.eyebrow,.muted{color:var(--muted)}.eyebrow{font-size:12px;letter-spacing:.12em}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:20px}
+.center{text-align:center}.tempo{font-size:76px;font-weight:750;line-height:1.1;margin:4px 0}
+button,select{font:inherit;color:var(--text);background:#252c40;border:1px solid var(--border);border-radius:12px;padding:11px 15px;min-height:44px}
+button{cursor:pointer}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.step{width:48px;height:48px;font-size:24px;padding:0}.tempo-row{display:flex;align-items:center;justify-content:center;gap:22px}
+input[type=range]{width:100%;accent-color:var(--accent);margin:18px 0 8px}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.presets{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:16px}
+.beats{display:flex;justify-content:center;gap:13px;flex-wrap:wrap;margin:18px 0}
+.beat{width:42px;height:42px;border-radius:50%;background:#41485b;transition:transform .08s,background .08s}
+.beat.active{background:var(--accent);transform:scale(1.16)}
+.actions{display:flex;gap:12px}.actions button{flex:1}
+.primary{background:var(--accent);border-color:var(--accent);font-weight:700}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+label{font-size:14px}label select{display:block;width:100%;margin-top:8px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px}
+.setting-row input{max-width:55%}
+@media(max-width:360px){.tempo{font-size:64px}.panel{padding:16px}.beat{width:34px;height:34px}}
+</style>
+</head>
+<body>
+<main id="app">
+<header><div><div class="eyebrow">MUSIC PRACTICE</div><h1>Metronome</h1></div><span class="muted" id="status" aria-live="polite">● Ready</span></header>
+<section class="panel center">
+<div class="muted">BEATS PER MINUTE</div>
+<div class="tempo-row"><button class="step" id="down" aria-label="Decrease BPM">−</button><div><div class="tempo" id="bpm">120</div><div class="muted">BPM</div></div><button class="step" id="up" aria-label="Increase BPM">+</button></div>
+<input id="slider" type="range" min="30" max="240" value="120" aria-label="Tempo slider">
+<div class="scale"><span>30 BPM</span><span>240 BPM</span></div>
+<div class="presets"><button data-bpm="60">60</button><button data-bpm="80">80</button><button data-bpm="100">100</button><button data-bpm="120">120</button><button data-bpm="140">140</button></div>
+</section>
+<section class="panel center"><strong>Beat indicator</strong><div class="beats" id="beats"><span class="beat active"></span><span class="beat"></span><span class="beat"></span><span class="beat"></span></div><div class="muted" id="beatlabel" aria-live="polite">Beat 1 of 4</div><div class="muted" id="beatword">FIRST BEAT</div></section>
+<div class="actions"><button class="primary" id="start">▶ Start</button><button id="tap">Tap Tempo</button></div>
+<section class="panel"><strong>Settings</strong>
+<div class="settings" style="margin-top:16px">
+<label>Time signature<select id="signature"><option value="2">2/4</option><option value="3">3/4</option><option value="4" selected>4/4</option><option value="5">5/4</option><option value="6">6/8</option><option value="7">7/8</option></select></label>
+<label>Accent first beat<select id="accent"><option value="yes">On</option><option value="no">Off</option></select></label>
+</div>
+<div class="setting-row"><label for="sound">Sound</label><select id="sound"><option value="click">Click</option><option value="wood">Woodblock</option><option value="beep">Beep</option></select></div>
+<div class="setting-row"><label for="volume">Volume</label><input id="volume" type="range" min="0" max="100" value="65"></div>
+</section>
+<div class="muted center" style="font-size:12px">Keep a steady rhythm. Adjust the BPM to match your practice.</div>
+</main>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+let bpm=120,running=false,beat=0,timer=null,audio=null,lastTap=0,taps=[];
+function setBpm(v){bpm=Math.max(30,Math.min(240,Math.round(Number(v)||120)));$('bpm').textContent=bpm;$('slider').value=bpm}
+function updateTempo(v){setBpm(v);if(running){clearInterval(timer);timer=setInterval(showBeat,60000/bpm)}}
+function makeAudio(){if(!audio){const C=window.AudioContext||window.webkitAudioContext;if(C)audio=new C()}if(audio?.state==='suspended')audio.resume()}
+function sound(accent){if(!audio)return;const osc=audio.createOscillator(),gain=audio.createGain(),now=audio.currentTime;const type=$('sound').value;osc.type=type==='wood'?'triangle':'sine';osc.frequency.value=type==='beep'?880:(accent?1100:700);gain.gain.setValueAtTime(Number($('volume').value)/100*.22,now);gain.gain.exponentialRampToValueAtTime(.001,now+.055);osc.connect(gain);gain.connect(audio.destination);osc.start(now);osc.stop(now+.06)}
+function showBeat(){const n=Number($('signature').value),accent=beat===0&&$('accent').value==='yes';document.querySelectorAll('.beat').forEach((el,i)=>el.classList.toggle('active',i===beat));$('beatlabel').textContent=`Beat ${beat+1} of ${n}`;$('beatword').textContent=beat===0?'FIRST BEAT':`BEAT ${beat+1}`;sound(accent);beat=(beat+1)%n}
+function stop(){running=false;clearInterval(timer);timer=null;beat=0;$('start').textContent='▶ Start';$('status').textContent='● Ready';document.querySelectorAll('.beat').forEach((el,i)=>el.classList.toggle('active',i===0));$('beatlabel').textContent=`Beat 1 of ${$('signature').value}`;$('beatword').textContent='FIRST BEAT'}
+function start(){if(running){stop();return}makeAudio();if(!audio){$('status').textContent='Audio unavailable';return}running=true;beat=0;$('start').textContent='■ Stop';$('status').textContent='● Playing';showBeat();timer=setInterval(showBeat,60000/bpm)}
+$('start').addEventListener('click',start);$('down').addEventListener('click',()=>updateTempo(bpm-1));$('up').addEventListener('click',()=>updateTempo(bpm+1));$('slider').addEventListener('input',e=>updateTempo(e.target.value));
+document.querySelectorAll('[data-bpm]').forEach(b=>b.addEventListener('click',()=>updateTempo(b.dataset.bpm)));
+$('signature').addEventListener('change',()=>{beat=0;const n=Number($('signature').value);$('beats').innerHTML=Array.from({length:n},()=>'<span class="beat"></span>').join('');$('beatlabel').textContent=`Beat 1 of ${n}`;$('beatword').textContent='FIRST BEAT'});
+$('tap').addEventListener('click',()=>{const now=Date.now();if(lastTap&&now-lastTap<2500){taps.push(now-lastTap);if(taps.length>5)taps.shift();if(taps.length>=2)updateTempo(60000/(taps.reduce((a,b)=>a+b,0)/taps.length))}else taps=[];lastTap=now;$('tap').textContent='Tap Tempo ✓';setTimeout(()=>$('tap').textContent='Tap Tempo',600)});
+})();
+</script>
+</body>
+</html>
